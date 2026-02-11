@@ -1,0 +1,558 @@
+#!/bin/bash
+
+# Vibe Coding Blueprint - Project Initialization Script
+# Creates context files and development scripts for AI-assisted development
+
+set -e
+
+# Colors
+BOLD='\033[1m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${BOLD}${BLUE}"
+echo "╔═══════════════════════════════════════════════════════════╗"
+echo "║         The Vibe Coding Blueprint - Project Setup        ║"
+echo "╚═══════════════════════════════════════════════════════════╝"
+echo -e "${NC}"
+
+# Gather project info
+read -p "Project name: " PROJECT_NAME
+read -p "Brief description: " PROJECT_DESC
+read -p "Tech stack (e.g., Flutter + Firebase): " TECH_STACK
+read -p "Complexity (🟢 simple / 🟡 moderate / 🔴 complex): " COMPLEXITY
+
+echo ""
+echo -e "${YELLOW}Creating project structure...${NC}"
+
+# Create directories
+mkdir -p .context
+mkdir -p scripts
+
+# Create CLAUDE.md
+cat > .context/CLAUDE.md << EOF
+# ${PROJECT_NAME}
+
+## Overview
+${PROJECT_DESC}
+
+## Tech Stack
+${TECH_STACK}
+
+## Complexity: ${COMPLEXITY}
+
+## Core Features
+1. [Feature 1]
+2. [Feature 2]
+3. [Feature 3]
+
+## Development Workflow
+- Use git worktrees for parallel development (\`./scripts/dev.sh\`)
+- Commit frequently
+- Follow design tokens (see DESIGN_SYSTEM.md)
+- Review RULES.md before each session
+
+## Getting Started
+1. Read RULES.md for safety rules
+2. Run \`./scripts/dev.sh\` to start a development session
+3. Ask clarifying questions before writing code
+EOF
+
+echo -e "${GREEN}✓${NC} Created .context/CLAUDE.md"
+
+# Create RULES.md
+cat > .context/RULES.md << 'EOF'
+# Development Rules
+
+## 🚫 FORBIDDEN GIT COMMANDS
+
+NEVER run these - they destroy uncommitted work:
+
+```bash
+git reset --hard          # Destroys all uncommitted changes
+git clean -fd             # Deletes untracked files permanently
+git checkout -- .         # Discards all changes
+git checkout -- <file>    # Discards changes to file
+```
+
+Safe alternatives:
+```bash
+git stash -u              # Temporarily store changes (retrievable)
+git stash pop             # Restore stashed changes
+git stash list            # See all stashes
+```
+
+## Complexity Rules
+
+### If 🟢 SIMPLE:
+- Maximum 3-4 files per feature
+- NO abstract classes or interfaces
+- Concrete implementations only
+- Keep it simple
+
+### If 🟡 MODERATE:
+- Minimal abstractions
+- Repository pattern okay
+- Still push back on complexity
+
+### If 🔴 COMPLEX:
+- Abstractions allowed WITH documentation
+- Must justify each abstraction
+- Simpler is still better
+
+## Approval Required For
+- Installing new dependencies
+- Database schema changes
+- Breaking API changes
+- Destructive git commands
+- Deleting files
+
+## Always Do
+- Ask clarifying questions before coding
+- Tell user which files you'll create/modify
+- Use design tokens, not raw values
+- Keep components under 200 lines
+- Test incrementally
+EOF
+
+echo -e "${GREEN}✓${NC} Created .context/RULES.md"
+
+# Create DESIGN_SYSTEM.md
+cat > .context/DESIGN_SYSTEM.md << 'EOF'
+# Design System
+
+## Colors
+```
+Primary: #2563EB
+Secondary: #64748B
+Success: #10B981
+Warning: #F59E0B
+Error: #EF4444
+Background: #FFFFFF
+Surface: #F8FAFC
+Text: #1E293B
+Text Muted: #64748B
+```
+
+## Typography
+- Headings: System font, weights 600-700
+- Body: System font, weight 400
+- Sizes: 12, 14, 16, 18, 20, 24, 32, 48
+
+## Spacing Scale
+4, 8, 12, 16, 24, 32, 48, 64
+
+## Border Radius
+- Small: 4px
+- Medium: 8px
+- Large: 12px
+- Full: 9999px
+
+## Usage
+Always use design tokens:
+```dart
+// ✅ Good
+Container(color: AppColors.primary)
+
+// ❌ Bad
+Container(color: Color(0xFF2563EB))
+```
+EOF
+
+echo -e "${GREEN}✓${NC} Created .context/DESIGN_SYSTEM.md"
+
+# Create ARCHITECTURE.md
+cat > .context/ARCHITECTURE.md << EOF
+# Architecture Decisions
+
+## Tech Stack
+${TECH_STACK}
+
+## Folder Structure
+[To be defined based on project needs]
+
+## Key Patterns
+[To be documented as patterns emerge]
+
+## Database Schema
+[To be defined]
+
+## API Design
+[To be defined]
+
+## State Management
+[To be defined based on complexity]
+EOF
+
+echo -e "${GREEN}✓${NC} Created .context/ARCHITECTURE.md"
+
+# Create dev.sh script for parallel development
+cat > scripts/dev.sh << 'DEVSCRIPT'
+#!/bin/bash
+
+# Parallel Development with Git Worktrees
+# Usage:
+#   ./scripts/dev.sh              Start session (prompts if multiple worktrees)
+#   ./scripts/dev.sh feature      Create/connect to worktree
+#   ./scripts/dev.sh --cleanup    Remove old worktrees
+#   ./scripts/dev.sh --help       Show help
+
+set -e
+
+PROJECT_NAME="PROJECT_NAME_PLACEHOLDER"
+
+# Colors
+BOLD='\033[1m'
+DIM='\033[2m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+show_help() {
+    echo -e "${BOLD}Parallel Development${NC}"
+    echo ""
+    echo "Usage:"
+    echo "  ./scripts/dev.sh              Start session"
+    echo "  ./scripts/dev.sh feature      Create/connect to worktree 'feature'"
+    echo "  ./scripts/dev.sh --cleanup    Remove old worktrees"
+    echo ""
+    echo "Examples:"
+    echo "  ./scripts/dev.sh auth         Work on authentication in parallel"
+    echo "  ./scripts/dev.sh bug-123      Fix bug in isolated environment"
+    echo ""
+    echo "How it works:"
+    echo "  Each worktree is a separate folder with its own branch."
+    echo "  You can run multiple Claude sessions without conflicts."
+    exit 0
+}
+
+show_cleanup() {
+    echo -e "${BOLD}Worktree Cleanup${NC}"
+    echo ""
+    
+    local main_repo=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+    local has_extras=false
+    
+    while IFS= read -r line; do
+        local path=$(echo "$line" | awk '{print $1}')
+        local branch=$(echo "$line" | awk '{print $3}' | tr -d '[]')
+        
+        # Skip main
+        [[ "$branch" == "main" || "$branch" == "master" ]] && continue
+        
+        has_extras=true
+        local dir=$(basename "$path")
+        local last_commit=$(git -C "$path" log -1 --format="%cr" 2>/dev/null || echo "unknown")
+        
+        echo -e "📂 ${BOLD}$dir${NC} ($branch)"
+        echo -e "   Last commit: $last_commit"
+        read -p "   Delete? [y/N] " choice
+        
+        if [[ "$choice" =~ ^[Yy]$ ]]; then
+            git worktree remove "$path" --force 2>/dev/null || rm -rf "$path"
+            git branch -d "$branch" 2>/dev/null || git branch -D "$branch" 2>/dev/null || true
+            echo -e "   ${GREEN}✓ Deleted${NC}"
+        else
+            echo -e "   ${DIM}Skipped${NC}"
+        fi
+        echo ""
+    done <<< "$(git worktree list)"
+    
+    if [ "$has_extras" = false ]; then
+        echo -e "${GREEN}✓ No extra worktrees. Only main exists.${NC}"
+    fi
+    exit 0
+}
+
+# Handle flags
+case "${1:-}" in
+    -h|--help|help) show_help ;;
+    --cleanup|cleanup) show_cleanup ;;
+esac
+
+# Find main repo
+find_main_repo() {
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+        if [ -d "$dir/.git" ]; then
+            echo "$dir"
+            return
+        elif [ -f "$dir/.git" ]; then
+            # We're in a worktree
+            echo "$(dirname "$(dirname "$(cat "$dir/.git" | sed 's/gitdir: //')")")"
+            return
+        fi
+        dir="$(dirname "$dir")"
+    done
+    echo "$PWD"
+}
+
+MAIN_REPO=$(find_main_repo)
+PARENT_DIR=$(dirname "$MAIN_REPO")
+
+# Get worktrees
+get_worktrees() {
+    git -C "$MAIN_REPO" worktree list 2>/dev/null
+}
+
+# Find worktree by name
+find_worktree() {
+    local name="$1"
+    while IFS= read -r line; do
+        local path=$(echo "$line" | awk '{print $1}')
+        local dir=$(basename "$path")
+        if [[ "$dir" == "$name" || "$dir" == "${PROJECT_NAME}-$name" ]]; then
+            echo "$path"
+            return
+        fi
+    done <<< "$(get_worktrees)"
+}
+
+# Handle worktree argument
+WORKTREE_ARG="${1:-}"
+WORKTREE_COUNT=$(get_worktrees | wc -l | tr -d ' ')
+
+if [ -n "$WORKTREE_ARG" ]; then
+    # User specified a worktree
+    TARGET=$(find_worktree "$WORKTREE_ARG")
+    
+    if [ -z "$TARGET" ]; then
+        # Create new worktree
+        echo -e "📂 Worktree '${BOLD}$WORKTREE_ARG${NC}' not found."
+        read -p "Create it? [Y/n] " choice
+        
+        if [[ ! "$choice" =~ ^[Nn]$ ]]; then
+            NEW_PATH="$PARENT_DIR/${PROJECT_NAME}-$WORKTREE_ARG"
+            BRANCH="feature/$WORKTREE_ARG"
+            
+            git -C "$MAIN_REPO" worktree add "$NEW_PATH" -b "$BRANCH"
+            echo -e "${GREEN}✓ Created:${NC} $NEW_PATH ($BRANCH)"
+            cd "$NEW_PATH"
+        else
+            exit 1
+        fi
+    else
+        cd "$TARGET"
+    fi
+elif [ "$WORKTREE_COUNT" -gt 1 ]; then
+    # Multiple worktrees - prompt selection
+    echo -e "${BOLD}Select Worktree${NC}"
+    echo ""
+    
+    declare -a PATHS
+    i=1
+    while IFS= read -r line; do
+        local path=$(echo "$line" | awk '{print $1}')
+        local branch=$(echo "$line" | awk '{print $3}' | tr -d '[]')
+        local dir=$(basename "$path")
+        
+        if [ "$path" = "$(pwd)" ]; then
+            echo -e "  $i) $dir ($branch) ${DIM}← current${NC}"
+        else
+            echo -e "  $i) $dir ($branch)"
+        fi
+        PATHS[$i]="$path"
+        ((i++))
+    done <<< "$(get_worktrees)"
+    
+    echo ""
+    read -p "Enter number (or Enter for current): " selection
+    
+    if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -lt "$i" ]; then
+        cd "${PATHS[$selection]}"
+    fi
+fi
+
+# Display status
+CURRENT_DIR=$(basename "$(pwd)")
+CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+
+echo ""
+echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
+echo -e "  📂 ${BOLD}$CURRENT_DIR${NC} ($CURRENT_BRANCH)"
+echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
+
+# Show other worktrees
+OTHER_COUNT=$((WORKTREE_COUNT - 1))
+if [ "$OTHER_COUNT" -gt 0 ]; then
+    echo ""
+    echo -e "${DIM}Other worktrees:${NC}"
+    get_worktrees | while IFS= read -r line; do
+        local path=$(echo "$line" | awk '{print $1}')
+        local branch=$(echo "$line" | awk '{print $3}' | tr -d '[]')
+        local dir=$(basename "$path")
+        [ "$dir" != "$CURRENT_DIR" ] && echo -e "  ${DIM}• $dir ($branch)${NC}"
+    done
+fi
+
+echo ""
+echo -e "${DIM}Commands: ./scripts/dev.sh <name> | --cleanup | --help${NC}"
+echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
+echo ""
+
+# Start Claude Code (if installed)
+if command -v claude &> /dev/null; then
+    claude
+else
+    echo -e "${YELLOW}Note: Claude Code CLI not found.${NC}"
+    echo "Install: npm install -g @anthropic-ai/claude-code"
+    echo ""
+    echo "For now, you can use this terminal for development."
+fi
+DEVSCRIPT
+
+# Replace PROJECT_NAME placeholder with actual project name
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s/PROJECT_NAME_PLACEHOLDER/${PROJECT_NAME}/" scripts/dev.sh
+else
+    # Linux
+    sed -i "s/PROJECT_NAME_PLACEHOLDER/${PROJECT_NAME}/" scripts/dev.sh
+fi
+
+chmod +x scripts/dev.sh
+echo -e "${GREEN}✓${NC} Created scripts/dev.sh (parallel development)"
+
+# Create vibe helper scripts
+cat > scripts/vibe-ideate << 'EOF'
+#!/bin/bash
+echo "Running ideation session..."
+claude "Read .context/CLAUDE.md and guide me through ideation using the Vibe Coding methodology."
+EOF
+chmod +x scripts/vibe-ideate
+echo -e "${GREEN}✓${NC} Created scripts/vibe-ideate"
+
+cat > scripts/vibe-architect << 'EOF'
+#!/bin/bash
+MODEL="${1:-sonnet}"
+echo "Running architecture session with $MODEL..."
+claude --model "$MODEL" "Read .context/CLAUDE.md and .context/ARCHITECTURE.md. Help me make architecture decisions."
+EOF
+chmod +x scripts/vibe-architect
+echo -e "${GREEN}✓${NC} Created scripts/vibe-architect"
+
+cat > scripts/vibe-dev << 'EOF'
+#!/bin/bash
+echo "Starting development session..."
+claude "Read all .context/ files and ask what I want to build."
+EOF
+chmod +x scripts/vibe-dev
+echo -e "${GREEN}✓${NC} Created scripts/vibe-dev"
+
+cat > scripts/vibe-debug << 'EOF'
+#!/bin/bash
+echo "Starting debugging session..."
+claude "Read all .context/ files. I have a bug to fix. Ask me about it."
+EOF
+chmod +x scripts/vibe-debug
+echo -e "${GREEN}✓${NC} Created scripts/vibe-debug"
+
+cat > scripts/vibe-review << 'EOF'
+#!/bin/bash
+echo "Starting code review..."
+claude "Read all .context/ files. Review my code for issues."
+EOF
+chmod +x scripts/vibe-review
+echo -e "${GREEN}✓${NC} Created scripts/vibe-review"
+
+# Create .gitignore if it doesn't exist
+if [ ! -f .gitignore ]; then
+    cat > .gitignore << 'EOF'
+# Dependencies
+node_modules/
+vendor/
+
+# Environment
+.env
+.env.local
+
+# Build outputs
+build/
+dist/
+*.apk
+*.ipa
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+EOF
+    echo -e "${GREEN}✓${NC} Created .gitignore"
+fi
+
+# Create README if it doesn't exist
+if [ ! -f README.md ]; then
+    cat > README.md << EOF
+# ${PROJECT_NAME}
+
+${PROJECT_DESC}
+
+## Tech Stack
+${TECH_STACK}
+
+## Complexity: ${COMPLEXITY}
+
+## Getting Started
+
+### Development
+\`\`\`bash
+# Start a development session
+./scripts/dev.sh
+
+# Work on a specific feature in parallel
+./scripts/dev.sh feature-name
+\`\`\`
+
+### Vibe Scripts
+- \`./scripts/vibe-ideate\` - Ideation session
+- \`./scripts/vibe-architect\` - Architecture decisions
+- \`./scripts/vibe-dev\` - Development session
+- \`./scripts/vibe-debug\` - Debugging help
+- \`./scripts/vibe-review\` - Code review
+
+## Project Structure
+\`\`\`
+.context/          # AI context files
+  CLAUDE.md        # Project overview
+  RULES.md         # Safety rules
+  DESIGN_SYSTEM.md # UI patterns
+  ARCHITECTURE.md  # Tech decisions
+scripts/           # Development scripts
+  dev.sh           # Parallel development
+  vibe-*           # Helper scripts
+\`\`\`
+
+---
+
+*Built with [The Vibe Coding Blueprint](https://github.com/dataDrivenFitness/VibeCodingBlueprint)*
+EOF
+    echo -e "${GREEN}✓${NC} Created README.md"
+fi
+
+# Summary
+echo ""
+echo -e "${BOLD}${GREEN}✨ Project initialized!${NC}"
+echo ""
+echo -e "${BOLD}Next steps:${NC}"
+echo "1. Review .context/RULES.md (safety rules)"
+echo "2. Customize .context/DESIGN_SYSTEM.md"
+echo "3. Initialize git: ${BOLD}git init && git add . && git commit -m 'Initial setup'${NC}"
+echo "4. Run: ${BOLD}./scripts/dev.sh${NC} to start developing"
+echo ""
+echo -e "${BOLD}Parallel Development:${NC}"
+echo "  ./scripts/dev.sh auth        # Work on authentication"
+echo "  ./scripts/dev.sh --cleanup   # Clean up old worktrees"
+echo ""
+echo -e "${BOLD}Helper Scripts:${NC}"
+echo "  ./scripts/vibe-ideate        # Ideation session"
+echo "  ./scripts/vibe-architect     # Architecture decisions"
+echo "  ./scripts/vibe-dev           # Development session"
+echo ""
+echo -e "${DIM}Documentation: https://github.com/dataDrivenFitness/VibeCodingBlueprint${NC}"
+echo ""
